@@ -1,0 +1,223 @@
+TITLE:: Morph
+summary:: Interfacing with the Sensel Morph
+categories:: External Control
+related:: Classes/MKtl
+
+DESCRIPTION::
+Interfacing with the Sensel Morph via TELETYPE::senselosc::.
+2020, Till Bovermann (http://tai-studio.org | http://lfsaw.de)
+
+
+NOTE::
+This class requires the TELETYPE::senselosc:: command-line interface, get it at https://github.com/tai-studio/senselosc .
+::
+
+CLASSMETHODS::
+
+METHOD:: new
+create new instance
+argument:: deviceID
+the id of the sensel morph (currently only teletype::0:: supported)
+
+INSTANCEMETHODS::
+
+PRIVATE:: init, prAddDefaultSpecs, contactProto, makeResponders, oscResponders, freeResponders
+
+METHOD:: runBinary
+run the TELETYPE::senselosc:: binary in a terminal
+argument:: scanDetail
+set scanning detail (0: low, 1:med, 2:high)
+
+METHOD:: binary
+binary path to the TELETYPE::senselosc:: binary.
+
+
+METHOD:: start
+start operating
+argument:: force
+when TELETYPE::true::, forces a restart
+
+
+METHOD:: stop
+stop operating
+
+
+METHOD:: deviceID
+RETURNS:: device ID
+
+METHOD:: deviceSpecs
+RETURNS:: Dictionary of link::Classes/ControlSpec::s used to normalise incoming values.
+
+SUBSECTION:: Values
+
+Collected values are stored in dictionaries.
+
+Each contact has the following elements stored. Ranges are normalised (teletype::vals.c::) or raw (teletype::deviceVals.c::, in sensels or gram).
+
+table::
+## teletype::state:: || one of code::[\invalid, \start, \drag, \end]::, raw values are code::[0, 1, 2, 3]::
+## teletype::x:: || x-pos 
+## teletype::y:: || y-pos
+## teletype::force:: || pressure
+## teletype::area:: || covered area
+## teletype::dist:: || distance to center position
+## teletype::wDist:: || distance to weighted center position
+## teletype::orientation:: || orientation of elipsis
+## teletype::majAxis:: || major axis length of elipsis
+## teletype::minAxis:: || minor axis length of elipsis
+## teletype::peakX:: || x-pos of pressure peak
+## teletype::peakY:: || y-pos of pressure peak
+## teletype::peakForce:: || pressure at pressure peak
+## teletype::minX:: || upper-left x-pos of bounding box
+## teletype::minY:: || upper-left y-pos of bounding box
+## teletype::maxX:: || lower-right x-pos of bounding box
+## teletype::maxY:: || lower-right y-pos of bounding box
+## teletype::dX:: || delta x since last update
+## teletype::dY:: || delta y since last update
+## teletype::dForce:: || delta force since last update
+## teletype::dArea:: || delta area since last update
+::
+
+The teletype::avg:: has the following elements stored. Ranges are normalised (teletype::vals.avg::) or raw (teletype::deviceVals.avg::, in sensels or gram).
+
+table::
+## teletype::\numContacts:: || number of contacts (normalised: code::i/16::) 
+## teletype::\x:: || average x-pos
+## teletype::\y:: || average y-pos
+## teletype::\force:: || average pressure
+## teletype::\dist:: || average distance between average position and all contacts
+## teletype::\area:: || average covered area
+## teletype::\wX:: || force-weighted x-pos
+## teletype::\wY:: || force-weighted y-pos
+## teletype::\tForce:: || summed forces of all contacts
+## teletype::\wDist:: || average distance between weighted average position and all contacts  
+::
+
+
+METHOD:: avg
+RETURNS:: Dictionary of all stored average values (normalised)
+
+METHOD:: contacts
+RETURNS:: Array of all stored contact values (normalised)
+
+
+METHOD:: vals, prevVals
+RETURNS:: Dictionary of all stored (previous) values (normalised)
+
+
+METHOD:: deviceVals, devicePrevVals
+RETURNS:: Dictionary of all stored (previous) values (raw)
+
+METHOD:: updatedContacts
+RETURNS:: Dictionary of all contacts that were updated in the last frame
+
+METHOD:: contactStates
+RETURNS:: Array of states, each one of code::[0, 1, 2, 3]::.
+
+
+SUBSECTION:: Actions
+
+actions are evaluated in the order
+
+NUMBEREDLIST::
+## TELETYPE::avgAction::
+## TELETYPE::contactPreAction::
+## TELETYPE::contactDownAction::
+## TELETYPE::contactDragAction::
+## TELETYPE::contactUpAction::
+## TELETYPE::contactPostAction::
+## TELETYPE::syncAction::
+::
+
+METHOD:: avgAction
+code:: 
+avgAction = {|avgVals, morph| /* code */};
+::
+
+METHOD:: contactPreAction
+code::
+contactPreAction = {|val, id, morph| /* code */}
+::
+METHOD:: contactDownAction
+code::
+contactDownAction = {|val, id, morph| /* code */}
+::
+METHOD:: contactDragAction
+code::
+contactDragAction = {|val, id, morph| /* code */}
+::
+METHOD:: contactUpAction
+code::
+contactUpAction = {|val, id, morph| /* code */}
+::
+METHOD:: contactPostAction
+code::
+contactPostAction = {|val, id, morph| /* code */}
+::
+
+METHOD:: syncAction
+code::
+syncAction = {|avg, contacts, me| /* code */}
+::
+
+METHOD:: clearActions
+remove all actions
+
+
+EXAMPLES::
+
+visualisation
+code::
+(
+q = q ? ();
+
+q.morph = Morph(0);
+q.morph.start;
+
+q.win = Window("visual", 200@200).front;
+q.view = UserView(q.win, q.win.view.bounds.insetBy(50,50));
+
+q.view.resize_(5)
+.background_(Color.gray)
+.drawFunc_({|me|
+	var width, height;
+	var contactColor = Color.gray(1, 1);
+	var avgColor = Color.gray(1, 0.3);
+	var wavgColor = Color.gray(1, 0.5);
+	width = me.bounds.width;
+	height = me.bounds.height;
+
+
+	q.morph.updatedContacts.keysValuesDo({|k, me|
+		Pen.color = contactColor;
+		Pen.addOval(Rect.aboutPoint(([me.x, me.y] * [width, height]).asPoint, me.force * 1000, me.force * 1000));
+		Pen.fill;
+		Pen.color = avgColor;
+		Pen.line(([me.x, me.y] * [width, height]).asPoint, ([q.morph.avg.x, q.morph.avg.y] * [width, height]).asPoint);
+		Pen.stroke;
+		Pen.color = wavgColor;
+		Pen.line(([me.x, me.y] * [width, height]).asPoint, ([q.morph.avg.wX, q.morph.avg.wY] * [width, height]).asPoint);
+		Pen.stroke;
+	});
+
+	// avg
+	Pen.color = avgColor;
+	Pen.addOval(Rect.aboutPoint(([q.morph.avg.x, q.morph.avg.y] * [width, height]).asPoint, q.morph.avg.tForce * 1000, q.morph.avg.tForce * 1000));
+	Pen.fill;
+
+	// avg
+	Pen.color = wavgColor;
+	Pen.addOval(Rect.aboutPoint(([q.morph.avg.wX, q.morph.avg.wY] * [width, height]).asPoint, q.morph.avg.tForce * 200, q.morph.avg.tForce * 200));
+	Pen.fill;
+
+});
+);
+
+q.morph.syncAction = {|avg, contacts, me|
+	{q.win.refresh}.defer
+}
+)
+
+// you might need to run the binary
+q.morph.runBinary;
+::

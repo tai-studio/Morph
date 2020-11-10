@@ -1,0 +1,12 @@
+(
+	\name: 			"Morph",
+	\path: 			"Morph", // path relative to the root Quarks folder
+	\summary:		"interfacing with the Sensel Morph",
+	\author: 		"Till Bovermann",
+	\organization: 	"tai-studio.org",
+//	\dependancies: ["Steno", "wslib"],
+	\country: 		"Germany",
+	\since: 		"2020",
+	\url:           "http://tai-studio.org",
+	\version: 1.0,
+)
