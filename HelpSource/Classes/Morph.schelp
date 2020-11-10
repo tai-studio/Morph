@@ -7,6 +7,7 @@ DESCRIPTION::
 Interfacing with the Sensel Morph via TELETYPE::senselosc::.
 2020, Till Bovermann (http://tai-studio.org | http://lfsaw.de)
 
+image::morph-gui.jpg::
 
 NOTE::
 This class requires the TELETYPE::senselosc:: command-line interface, get it at https://github.com/tai-studio/senselosc .
