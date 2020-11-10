@@ -21,7 +21,7 @@ the id of the sensel morph (currently only teletype::0:: supported)
 
 INSTANCEMETHODS::
 
-PRIVATE:: init, prAddDefaultSpecs, contactProto, makeResponders, oscResponders, freeResponders
+PRIVATE:: init, prAddDefaultSpecs, contactProto, avgProto, makeResponders, oscResponders, freeResponders, guiClosed
 
 METHOD:: runBinary
 run the TELETYPE::senselosc:: binary in a terminal
@@ -163,8 +163,129 @@ syncAction = {|avg, contacts, me| /* code */}
 METHOD:: clearActions
 remove all actions
 
+code::
+m = m ?? {Morph()};
+m.start;
+
+(
+m.contactDownAction = {|vals, id|
+	[\d, id, vals.x, vals.y].postln;
+};
+m.contactUpAction = {|vals, id|
+	[\u, id, vals.x, vals.y].postln;
+};
+m.contactDragAction = {|vals, id|
+	[\d, id, vals.x, vals.y].postln;
+};
+::
+
+METHOD:: gui
+creates a graphical display of the morph's state.
+
+code::
+m = Morph();
+m.start;
+g = m.gui;
+
+g.bgColor = Color.magenta;
+g.cColor = Color.cyan;
+g.wavgColor = Color.yellow;
+::
 
 EXAMPLES::
+
+no sound example
+
+code::
+m = m ?? {Morph()};
+m.start;
+
+(
+m.contactDownAction = {|vals, id|
+	[\d, id, vals.x, vals.y].postln;
+};
+m.contactUpAction = {|vals, id|
+	[\u, id, vals.x, vals.y].postln;
+};
+m.contactDragAction = {|vals, id|
+	[\d, id, vals.x, vals.y].postln;
+};
+::
+
+simple sound example
+code::
+(
+// a place to put things
+q = q ? ();
+
+// a voice
+SynthDef(\sine, {|x, y, force, gate = 1|
+	var snd, fSpread, amp;
+	var lFreq = 320/2, numOctaves = 4;
+
+
+
+	var freq = x.linexp(0, 1, lFreq, lFreq * (2**(numOctaves-1))
+);
+	var mul = VarLag.kr(force.linlin(0, 2, 0, 2), 0.1);
+	var fb = y.linlin(0, 1, 0, 2);
+
+	fSpread = y * 0.1 * [1, -0.5, 0.5, -1];
+	// fSpread = 0;
+
+	amp = Env.adsr(0.01, 0.3, 0.8, 2, 1).kr(2, gate: gate);
+
+
+
+	snd = SinOscFB.ar(freq + fSpread, fb, amp).tanh;
+
+	DetectSilence.ar(LeakDC.ar(snd), doneAction: 2);
+
+	Out.ar(0, Splay.ar(snd, center: x - 0.5) * mul * AmpCompA.kr(freq, 100);
+);
+
+}).add;
+)
+
+(
+// create the morph interface and a place for the synth voices
+q.morph = q.morph ?? {Morph()};
+q.morph.start;
+
+q.synths = q.synths ? ();
+)
+
+(
+// down >> create voice
+q.morph.contactDownAction = {|vals, id|
+	q.synths[id].notNil.if({
+		q.synths[id].release
+	});
+	q.synths[id] = Synth(\sine, [vals.x, vals.y, vals.force])
+};
+
+// drag >> update voice parameters
+q.morph.contactDragAction = {|vals, id|
+	q.synths[id].notNil.if({
+		q.synths[id].set(
+			\x, vals.x, 
+			\y, 1-vals.y, 
+			\force, vals.force
+		)
+	})
+};
+
+// up >> free voice
+q.morph.contactUpAction = {|vals, id|
+	q.synths[id].set(\gate, 0);
+	q.synths[id] = nil;
+};
+)
+
+// clear actions
+q.morph.clearActions;
+::
+
 
 visualisation
 code::

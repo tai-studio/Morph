@@ -1,13 +1,14 @@
 Morph {
-	var <>binary;
 	var <deviceID;
+	var <>binary;
 	var <oscResponders;
 	var <deviceSpecs, <contactStates;
 	var <>avgAction, <>syncAction;
 	var <>contactPreAction,<>contactPostAction;
 	var <>contactDownAction, <>contactUpAction, <>contactDragAction;
 	var <deviceVals, <vals, <devicePrevVals, <prevVals;
-	var <contactProto, <updatedContacts;
+	var <contactProto, <avgProto, <updatedContacts;
+	var gui;
 
 	*new{|deviceID = 0|
 		^super.newCopyArgs(deviceID).init;
@@ -46,24 +47,37 @@ Morph {
 			dArea:   0
 		);
 
+		avgProto = (
+			numContacts: 0,
+			x: 0,
+			y: 0,
+			force: 0,
+			dist: 0,
+			area: 0,
+			wX: 0,
+			wY: 0,
+			tForce: 0,
+			wDist: 0,
+		);
+
 		updatedContacts = ();
 
 		vals = (
 			c: {().proto_(contactProto)}!16,  // contacts
-			avg: (); // average values
+			avg: ().proto_(avgProto); // average values
 		);
-		prevVals = (
-			c: {().proto_(contactProto)}!16,  // contacts
-			avg: (); // average values
-		);
+		// prevVals = (
+		// 	c: {().proto_(contactProto)}!16,  // contacts
+		// 	avg: ().proto_(avgProto); // average values
+		// );
 		deviceVals = (
 			c: {().proto_(contactProto)}!16,  // contacts
-			avg: (); // average values
+			avg: ().proto_(avgProto); // average values
 		);
-		devicePrevVals = (
-			c: {().proto_(contactProto)}!16,  // contacts
-			avg: (); // average values
-		);
+		// devicePrevVals = (
+		// 	c: {().proto_(contactProto)}!16,  // contacts
+		// 	avg: ().proto_(avgProto); // average values
+		// );
 
 		// all responders
 		oscResponders = ();
@@ -313,6 +327,10 @@ Morph {
 					this
 				);
 
+				gui.notNil.if{
+					{gui.window.refresh}.defer;
+				}
+
 			}, "sync", argTemplate: [deviceID]),    
 		)
 	}
@@ -330,5 +348,78 @@ Morph {
 			resp.free;
 		};
 		oscResponders = ();
+	}
+
+	gui {|bgColor, cColor, avgColor, wavgColor|
+		gui.isNil.if{
+			gui = MorphGUI(this, bgColor, cColor, avgColor, wavgColor);
+		}
+		^gui;
+	}
+	guiClosed {
+		gui = nil;
+	}
+}
+
+
+MorphGUI {
+	var <morph, <bgColor, <>cColor, <>avgColor, <>wavgColor;
+	var <window, view;
+	*new {|morph, bgColor, cColor, avgColor, wavgColor|
+		^super.newCopyArgs(morph, bgColor, cColor, avgColor, wavgColor).init;
+	}
+	bgColor_{|color|
+		bgColor = color;
+		view.background_(bgColor);
+	}
+	init{
+		bgColor = bgColor ?? {Color.gray(0.5)};
+		cColor = cColor ?? {Color.gray(1, 1)};
+		avgColor = avgColor ?? {Color.gray(1, 0.3)};
+		wavgColor = wavgColor ?? {Color.gray(1, 0.5)};
+
+		window = Window("Morph (%)".format(morph.deviceID), 400@300).front;
+		window.onClose_{
+			morph.guiClosed
+		};
+		view = UserView(window, window.view.bounds.insetBy(20,20));
+		view
+			.resize_(5)
+			.background_(bgColor);
+
+		view.drawFunc = {|view|
+			var width, height;
+
+			var avgPos = [morph.avg.x, morph.avg.y];
+			var avgWPos = [morph.avg.wX, morph.avg.wY];
+			var avgForce = morph.avg.force;
+			var avgTForce = morph.avg.tForce;
+			var extent = [view.bounds.width, view.bounds.height];
+			var scaling = extent.maxItem; 
+			morph.updatedContacts.keysValuesDo({|k, me|
+				var pos = [me.x, me.y];
+				var force = me.force;
+
+				Pen.color = cColor;
+				Pen.addOval(Rect.aboutPoint((pos * extent).asPoint, force * scaling, force * scaling));
+				Pen.fill;
+				Pen.color = avgColor;
+				Pen.line((pos * extent).asPoint, (avgPos * extent).asPoint);
+				Pen.stroke;
+				Pen.color = wavgColor;
+				Pen.line((pos * extent).asPoint, (avgWPos * extent).asPoint);
+				Pen.stroke;
+			});
+
+			// avg
+			Pen.color = avgColor;
+			Pen.addOval(Rect.aboutPoint((avgPos * extent).asPoint, avgForce * scaling, avgForce * scaling));
+			Pen.fill;
+
+			// weighted avg
+			Pen.color = wavgColor;
+			Pen.addOval(Rect.aboutPoint((avgWPos * extent).asPoint, avgTForce * scaling, avgTForce * scaling));
+			Pen.fill;
+		};
 	}
 }
