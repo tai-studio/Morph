@@ -2,12 +2,12 @@ Morph {
 	var <deviceID;
 	var <>binary;
 	var <oscResponders;
-	var <deviceSpecs, <contactStates;
+	var <deviceSpecs;
 	var <>avgAction, <>syncAction;
 	var <>contactPreAction,<>contactPostAction;
 	var <>contactDownAction, <>contactUpAction, <>contactDragAction;
 	var <deviceVals, <vals, <devicePrevVals, <prevVals;
-	var <contactProto, <avgProto, <updatedContacts;
+	var <contactProto, <contactDeviceProto, <avgProto, <updatedContacts, <maxContacts=16;
 	var gui;
 
 	*new{|deviceID = 0|
@@ -15,15 +15,49 @@ Morph {
 	}
 
 	contacts {
-		^(vals.c)
+		^(vals.contacts)
 	}
 	avg {
 		^(vals.avg)
 	}
 	init {
-		binary = "/localvol/interfacing/senselosc/build/apps/senselosc";
+		binary = "~/vol/dev/interfacing/senselosc/build/apps/senselosc".standardizePath;
 
-		contactProto = (
+		deviceSpecs = (
+			\state      : ReverseIdxItemsSpec([\invalid, \start, \drag, \end], 0), // in lfsaw.de quark
+			\numContacts: [0, maxContacts-1, \lin].asSpec,
+			\x          : [0,    240,      \lin].asSpec,
+			\y          : [0,    139,      \lin].asSpec,
+			\wX         : [0,    240,      \lin].asSpec,
+			\wY         : [0,    139,      \lin].asSpec,
+			\dX         : [0,    240,      \lin].asSpec,
+			\dY         : [0,    139,      \lin].asSpec,
+			\minX       : [0,    240,      \lin].asSpec,
+			\minY       : [0,    139,      \lin].asSpec,
+			\maxX       : [0,    240,      \lin].asSpec,
+			\maxY       : [0,    139,      \lin].asSpec,
+			\peakX      : [0,    240,      \lin].asSpec,
+			\peakY      : [0,    139,      \lin].asSpec,
+			//// "correct" values
+			// \force      : [0,   8192,      \lin].asSpec,
+			// \peakForce  : [0,   8192,      \lin].asSpec,
+			// \tForce     : [0, 3*8192,      \lin].asSpec,
+			// \dForce     : [0, 3*8192,      \lin].asSpec,
+			// \area : [0, 33360, \lin].asSpec,
+			\force      : [0,    0.25 * 8192, \lin].asSpec,
+			\peakForce  : [0,    0.25 * 8192, \lin].asSpec,
+			\dForce     : [0,    0.25 * 8192, \lin].asSpec,
+			\tForce     : [0, 3* 0.25 * 8192, \lin].asSpec,
+			\area       : [0, 33360 * 0.2, \lin].asSpec,
+			\dArea      : [0, 33360 * 0.2, \lin].asSpec,
+			\dist       : [0, 240, \lin].asSpec,
+			\wDist      : [0, 240, \lin].asSpec,
+			\orientation: [0, 360, \lin].asSpec,
+			\majAxis    : [0, 240, \lin].asSpec,
+			\minAxis    : [0, 240, \lin].asSpec
+		);
+
+		contactDeviceProto = (
 			state:        0,
 			x:            0,
 			y:            0,
@@ -32,20 +66,24 @@ Morph {
 			dist:         0,
 			wDist:        0,
 			orientation:  0,
-			majAxis:   0,
-			minAxis:   0,
-			peakX:       0,
-			peakY:       0,
-			peakForce:   0,
-			minX:        0,
-			minY:        0,
-			maxX:        0,
-			maxY:        0,
-			dX:      0,
-			dY:      0,
-			dForce:  0,
-			dArea:   0
+			majAxis:      0,
+			minAxis:      0,
+			peakX:        0,
+			peakY:        0,
+			peakForce:    0,
+			minX:         0,
+			minY:         0,
+			maxX:         0,
+			maxY:         0,
+			dX:           0,
+			dY:           0,
+			dForce:       0,
+			dArea:        0
 		);
+
+		contactProto = contactDeviceProto.collect{|v, k|
+			deviceSpecs[k].unmap(v)
+		};
 
 		avgProto = (
 			numContacts: 0,
@@ -63,39 +101,24 @@ Morph {
 		updatedContacts = ();
 
 		vals = (
-			c: {().proto_(contactProto)}!16,  // contacts
+			contacts: {().proto_(contactProto)}!maxContacts,  // contacts
 			avg: ().proto_(avgProto); // average values
 		);
 		// prevVals = (
-		// 	c: {().proto_(contactProto)}!16,  // contacts
+		// 	c: {().proto_(contactProto)}!maxContacts,  // contacts
 		// 	avg: ().proto_(avgProto); // average values
 		// );
 		deviceVals = (
-			c: {().proto_(contactProto)}!16,  // contacts
+			contacts: {().proto_(contactDeviceProto)}!maxContacts,  // contacts
 			avg: ().proto_(avgProto); // average values
 		);
 		// devicePrevVals = (
-		// 	c: {().proto_(contactProto)}!16,  // contacts
+		// 	c: {().proto_(contactProto)}!maxContacts,  // contacts
 		// 	avg: ().proto_(avgProto); // average values
 		// );
 
 		// all responders
 		oscResponders = ();
-
-		contactStates = #[\invalid, \start, \drag, \end];
-		deviceSpecs = (
-			\numContacts: [0, 15, \lin].asSpec,
-			\x          : [0, 240, \lin].asSpec,
-			\y          : [0, 139, \lin].asSpec,
-			\force      : [0, 8192, \lin].asSpec,
-			\totalForce : [0, 3*8192, \lin].asSpec,
-			\area       : [0, 33360 * 0.2, \lin].asSpec,
-			// \area : [0, 33360, \lin].asSpec,
-			\dist       : [0, 240, \lin].asSpec,
-			\orientation: [0, 360, \lin].asSpec,
-			\majAxis    : [0, 240, \lin].asSpec,
-			\minAxis    : [0, 240, \lin].asSpec,
-		);
 	}
 
 	runBinary {|scanDetail = 2|
@@ -122,40 +145,39 @@ Morph {
 		oscResponders = (
 			\avg: OSCFunc({|msg, time|
 				var myVals, myPrevVals, myDeviceVals, myDevicePrevVals;
-				var name, deviceID, numContacts, x, y, avgForce, avgDist, avgArea, xX, wY, totalForce, avgWDist;
-				# name, deviceID, numContacts, x, y, avgForce, avgDist, avgArea, xX, wY, totalForce, avgWDist = msg;
-				
+				var name, deviceID, numContacts, x, y, force, dist, area, wX, wY, tForce, wDist;
+				# name, deviceID, numContacts, x, y, force, dist, area, wX, wY, tForce, wDist = msg;
+
 				// prevVals       = vals.avg.deepCopy;
 				// devicePrevVals = deviceVals.avg.deepCopy;
 
 				myVals     = vals.avg;
 				myDeviceVals = deviceVals.avg;
 
-				// myVals.postln;
 				myVals.putPairs([
 					\numContacts,  deviceSpecs[\numContacts].unmap(numContacts),
-					\x, deviceSpecs[\x].unmap(x),
-					\y, deviceSpecs[\y].unmap(y),
-					\force, deviceSpecs[\force].unmap(avgForce),
-					\dist, deviceSpecs[\dist].unmap(avgDist),
-					\area, deviceSpecs[\area].unmap(avgArea),
-					\wX, deviceSpecs[\x].unmap(xX),
-					\wY, deviceSpecs[\y].unmap(wY),
-					\tForce, deviceSpecs[\totalForce].unmap(totalForce),
-					\wDist, deviceSpecs[\dist].unmap(avgWDist),
+					\x,            deviceSpecs[\x          ].unmap(x),
+					\y,            deviceSpecs[\y          ].unmap(y),
+					\force,        deviceSpecs[\force      ].unmap(force),
+					\dist,         deviceSpecs[\dist       ].unmap(dist),
+					\area,         deviceSpecs[\area       ].unmap(area),
+					\wX,           deviceSpecs[\wX         ].unmap(wX),
+					\wY,           deviceSpecs[\wY         ].unmap(wY),
+					\tForce,       deviceSpecs[\tForce     ].unmap(tForce),
+					\wDist,        deviceSpecs[\wDist      ].unmap(wDist),
 					]);
 
 				myDeviceVals.putPairs([
 					\numContacts, numContacts,
 					\x, x,
 					\y, y,
-					\force, avgForce,
-					\dist, avgDist,
-					\area, avgArea,
-					\wX, xX,
+					\force, force,
+					\dist, dist,
+					\area, area,
+					\wX, wX,
 					\wY, wY,
-					\tForce, totalForce,
-					\wDist, avgWDist,
+					\tForce, tForce,
+					\wDist, wDist,
 					]);
 				}, "/contactAvg", argTemplate: [deviceID]),
 
@@ -163,16 +185,15 @@ Morph {
 				var myVals, myPrevVals, myDeviceVals, myDevicePrevVals;
 				var name, deviceID, id, state, x, y, force, area, dist, wDist, orientation, majAxis, minAxis;
 				# name, deviceID, id, state, x, y, force, area, dist, wDist, orientation, majAxis, minAxis = msg;
-				
-				// prevVals      [id] = vals.c[id].deepCopy;
-				// devicePrevVals[id] = deviceVals.c[id].deepCopy;
 
-				myVals     = vals.c[id];
-				myDeviceVals = deviceVals.c[id];
+				// prevVals      [id] = vals.contacts[id].deepCopy;
+				// devicePrevVals[id] = deviceVals.contacts[id].deepCopy;
 
-				// myVals.postln;
+				myVals     = vals.contacts[id];
+				myDeviceVals = deviceVals.contacts[id];
+
 				myVals.putPairs([
-					\state,       contactStates[state],
+					\state,       deviceSpecs[\state      ].unmap(state),
 					\x,           deviceSpecs[\x          ].unmap(x),
 					\y,           deviceSpecs[\y          ].unmap(y),
 					\force,       deviceSpecs[\force      ].unmap(force),
@@ -180,8 +201,8 @@ Morph {
 					\dist,        deviceSpecs[\dist       ].unmap(dist),
 					\wDist,       deviceSpecs[\dist       ].unmap(wDist),
 					\orientation, deviceSpecs[\orientation].unmap(orientation),
-					\majAxis,     deviceSpecs[\x          ].unmap(majAxis),
-					\minAxis,     deviceSpecs[\x          ].unmap(minAxis),
+					\majAxis,     deviceSpecs[\majAxis    ].unmap(majAxis),
+					\minAxis,     deviceSpecs[\minAxis    ].unmap(minAxis),
 					]);
 
 				myDeviceVals.putPairs([
@@ -204,16 +225,14 @@ Morph {
 				var myVals, myPrevVals, myDeviceVals, myDevicePrevVals;
 				var name, deviceID, id, state, dX, dY, dForce, dArea;
 				# name, deviceID, id, state, dX, dY, dForce, dArea = msg;
-				
-				// prevVals      [id] = vals.c[id].deepCopy;
-				// devicePrevVals[id] = deviceVals.c[id].deepCopy;
 
-				myVals     = vals.c[id];
-				myDeviceVals = deviceVals.c[id];
+				// prevVals      [id] = vals.contacts[id].deepCopy;
+				// devicePrevVals[id] = deviceVals.contacts[id].deepCopy;
 
-				// myVals.postln;
+				myVals     = vals.contacts[id];
+				myDeviceVals = deviceVals.contacts[id];
+
 				myVals.putPairs([
-					// \state,    contactStates[state],
 					\dX,     deviceSpecs[\x].unmap(dX),
 					\dY,     deviceSpecs[\y].unmap(dY),
 					\dForce, deviceSpecs[\force].unmap(dForce),
@@ -233,20 +252,18 @@ Morph {
 				var myVals, myPrevVals, myDeviceVals, myDevicePrevVals;
 				var name, deviceID, id, state, minX, minY, maxX, maxY;
 				# name, deviceID, id, state, minX, minY, maxX, maxY = msg;
-				
-				// prevVals      [id] = vals.c[id].deepCopy;
-				// devicePrevVals[id] = deviceVals.c[id].deepCopy;
 
-				myVals     = vals.c[id];
-				myDeviceVals = deviceVals.c[id];
+				// prevVals      [id] = vals.contacts[id].deepCopy;
+				// devicePrevVals[id] = deviceVals.contacts[id].deepCopy;
 
-				// myVals.postln;
+				myVals     = vals.contacts[id];
+				myDeviceVals = deviceVals.contacts[id];
+
 				myVals.putPairs([
-					// \state,    contactStates[state],
-					\minX,       deviceSpecs[\x].unmap(minX),
-					\minY,       deviceSpecs[\y].unmap(minY),
-					\maxX,       deviceSpecs[\x].unmap(maxX),
-					\maxY,       deviceSpecs[\y].unmap(maxY),
+					\minX,       deviceSpecs[\minX].unmap(minX),
+					\minY,       deviceSpecs[\minY].unmap(minY),
+					\maxX,       deviceSpecs[\maxX].unmap(maxX),
+					\maxY,       deviceSpecs[\maxY].unmap(maxY),
 					]);
 
 				myDeviceVals.putPairs([
@@ -262,23 +279,20 @@ Morph {
 				var myVals, myPrevVals, myDeviceVals, myDevicePrevVals;
 				var name, deviceID, id, state, peakX, peakY, peakForce;
 				# name, deviceID, id, state, peakX, peakY, peakForce = msg;
-				
-				// prevVals      [id] = vals.c[id].deepCopy;
-				// devicePrevVals[id] = deviceVals.c[id].deepCopy;
 
-				myVals     = vals.c[id];
-				myDeviceVals = deviceVals.c[id];
+				// prevVals      [id] = vals.contacts[id].deepCopy;
+				// devicePrevVals[id] = deviceVals.contacts[id].deepCopy;
 
-				// myVals.postln;
+				myVals     = vals.contacts[id];
+				myDeviceVals = deviceVals.contacts[id];
+
 				myVals.putPairs([
-					// \state,    contactStates[state],
-					\peakX,      deviceSpecs[\x].unmap(peakX),
-					\peakY,      deviceSpecs[\y].unmap(peakY),
-					\peakForce,  deviceSpecs[\force].unmap(peakForce),
+					\peakX,      deviceSpecs[\peakX].unmap(peakX),
+					\peakY,      deviceSpecs[\peakY].unmap(peakY),
+					\peakForce,  deviceSpecs[\peakForce].unmap(peakForce),
 					]);
 
 				myDeviceVals.putPairs([
-					// \state,    state,
 					\peakX, peakX,
 					\peakY, peakY,
 					\peakForce, peakForce,
@@ -292,15 +306,15 @@ Morph {
 				# name, deviceID ... updatedContactIDs  = msg;
 
 				updatedContactIDs = updatedContactIDs.selectIndices{|v| v > 0}; // convert to indices
-				updatedContacts = updatedContactIDs.collectAs({|id| (id -> vals.c[id])}, Event);
+				updatedContacts = updatedContactIDs.collectAs({|id| (id -> vals.contacts[id])}, Event);
 
 				// average action
 				avgAction.value(vals.avg, this);
 
 				// contact actions
 				updatedContactIDs.do{|id|
-					myVals     = vals.c[id];
-					myDeviceVals = deviceVals.c[id];
+					myVals     = vals.contacts[id];
+					myDeviceVals = deviceVals.contacts[id];
 
 					contactPreAction.value(myVals, id, this);
 					switch(myDeviceVals.state,
@@ -322,8 +336,8 @@ Morph {
 
 				// sync action
 				syncAction.value(
-					vals.avg, 
-					updatedContacts, 
+					vals.avg,
+					updatedContacts,
 					this
 				);
 
@@ -331,7 +345,7 @@ Morph {
 					{gui.window.refresh}.defer;
 				}
 
-			}, "sync", argTemplate: [deviceID]),    
+			}, "sync", argTemplate: [deviceID]),
 		)
 	}
 
@@ -395,7 +409,7 @@ MorphGUI {
 			var avgForce = morph.avg.force;
 			var avgTForce = morph.avg.tForce;
 			var extent = [view.bounds.width, view.bounds.height];
-			var scaling = extent.maxItem; 
+			var scaling = extent.maxItem;
 			morph.updatedContacts.keysValuesDo({|k, me|
 				var pos = [me.x, me.y];
 				var force = me.force;
