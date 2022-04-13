@@ -95,6 +95,11 @@ table::
 ::
 
 
+Below you can see how the different parametes affect each other. Shown are: positions and force of two contacts, their average position and force (contantly in-between), and their weighted average position and force (moving from one to the other while force is altered).
+
+image::morph-parameters.gif::
+
+
 METHOD:: avg
 RETURNS:: Dictionary of all stored average values (normalised)
 
