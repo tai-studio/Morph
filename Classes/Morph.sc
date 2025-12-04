@@ -121,10 +121,29 @@ Morph {
 		oscResponders = ();
 	}
 
-	runBinary {|scanDetail = 2|
+	runBinary {|scanDetail = 2, force = false|
 		var sendPort = NetAddr.localAddr.port;
 		var command = format("% -d% -p%", binary, scanDetail, sendPort);
-		command.postln.runInTerminal;
+
+
+		var commandRunning = false;
+
+
+		force.if({
+			// kill all morphs
+			"pkill %".format(this.binary).systemCmd;
+		}, {
+			// determine if there's a process
+			commandRunning = "pgrep -f %".format(this.binary).systemCmd == 0;
+		});
+
+
+
+		commandRunning.if({
+			"Morph process already running, use runBinary(force: true) to force restart.".inform;
+		}, {
+			command.postln.runInTerminal;
+		})
 	}
 	start {|force = false|
 		this.makeResponders(force);
